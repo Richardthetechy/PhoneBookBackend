@@ -1,6 +1,21 @@
+require('dotenv').config()
+const mongoose = require('mongoose')
 const express = require('express')
 const morgan = require('morgan')
 const cors = require('cors')
+
+const Person = require('./models/index')
+const url = process.env.MONGODB_URI
+
+mongoose.connect(url)
+.then(() => {
+    console.log('Connected to MongoDB')
+})
+.catch((error) => {
+    console.log('Error connecting to MongoDB:', error.message)
+})
+
+
 
 const app = express()
 app.use(express.json())
@@ -14,31 +29,12 @@ morgan.token('postData', (req) => {
   return ' '
 })
 app.use(morgan(':method :url :status - :response-time ms :res[content-length] :postData'))
-let persons = [
-{ 
-    id: "1",
-    name: "Arto Hellas", 
-    number: "040-123456"
-  },
-  { 
-    id: "2",
-    name: "Ada Lovelace", 
-    number: "39-44-5323523"
-  },
-  { 
-    id: "3",
-    name: "Dan Abramov", 
-    number: "12-43-234345"
-  },
-  { 
-    id: "4",
-    name: "Mary Poppendieck", 
-    number: "39-23-6423122"
-  }
-]
+let persons = []
 
 app.get('/api/persons', (req, res) => {
-    res.json(persons)
+    Person.find({}).then(persons => {
+      res.json(persons)
+    })
 })
 
 app.get('/info', (req, res) => {
@@ -55,14 +51,27 @@ app.get('/info', (req, res) => {
 
 app.get('/api/persons/:id', (req, res) => {
   const id = req.params.id
-  const person = persons.find(person => person.id === id)
-  console.log(person);
-  
-  if (person) {
+  Person.findById(id).then(person => {
     res.json(person)
-  } else {
-    res.status(404).end()
+  })
+})
+app.put('/api/persons/:id', (req, res) => {
+  const id = req.params.id 
+  const {number} = req.body
+  if (!number) {
+    return res.status(400).json({
+      error: "number missing"
+    })
   }
+  Person.findByIdAndUpdate(id, {number}, {new: true})
+  .then(updatedPerson => {
+    if (updatedPerson) {
+      return res.json(updatedPerson)
+    } else {
+      return res.status(404).end()
+    }
+  })
+  .catch(error => next(error))
 })
 app.delete('/api/persons/:id', (req, res) => {
   const id = req.params.id
@@ -82,18 +91,17 @@ app.post('/api/persons', (req, res) => {
       error: "name already exist"
     })
   }
-  const person = {
+  const person = new Person({
     name: body.name,
-    number: body.number,
-    id: Math.floor(Math.random() * 1000)
-  }
-  console.log(person)
-  persons = persons.concat(person)
-  res.json(person).end()
+    number: body.number
+  })
+  person.save().then(savedPerson => {
+    res.json(savedPerson).end()
+  }) 
   
 })
 
-const PORT = process.env.PORT || 3001
+const PORT = process.env.PORT
 app.listen(PORT, () => {
     console.log(`Server running on PORT: ${PORT}`)
 })
