@@ -37,13 +37,16 @@ app.get('/api/persons', (req, res) => {
     })
 })
 
-app.get('/info', (req, res) => {
+app.get('/info',  (req, res,next ) => {
   const reqTime = new Date()
-  res.send(`
+  Person.countDocuments({}).then(count => {
+    res.send(`
     <div>
-    <p>Phonebook has info for ${persons.length} people </p>
+    <p>Phonebook has info for ${count} people </p>
     <p>${reqTime}</p>
     `)
+  })
+  .catch(error => next(error))
 })
 
 
