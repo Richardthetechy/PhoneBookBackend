@@ -49,13 +49,19 @@ app.get('/info', (req, res) => {
 
 
 
-app.get('/api/persons/:id', (req, res) => {
+app.get('/api/persons/:id', (req, res, next) => {
   const id = req.params.id
   Person.findById(id).then(person => {
-    res.json(person)
+    if (person) {
+      res.json(person)
+    } else {
+      res.status(404).end()
+    }
   })
+  .catch(error => next(error))
+
 })
-app.put('/api/persons/:id', (req, res) => {
+app.put('/api/persons/:id', (req, res, next) => {
   const id = req.params.id 
   const {number} = req.body
   if (!number) {
@@ -73,13 +79,19 @@ app.put('/api/persons/:id', (req, res) => {
   })
   .catch(error => next(error))
 })
-app.delete('/api/persons/:id', (req, res) => {
+app.delete('/api/persons/:id', (req, res, next) => {
   const id = req.params.id
-  persons = persons.filter(p => p.id !== id)
-  res.status(204).end()
+  Person.findByIdAndDelete(id).then(result => {
+    if (result) {
+      res.status(204).end()
+    } else {
+      res.status(404).end()
+    }
+  })
+  .catch(error => next(error))
 })
 
-app.post('/api/persons', (req, res) => {
+app.post('/api/persons', (req, res, next) => {
   const body = req.body
 
   if (!body.name || !body.number) {
@@ -98,6 +110,7 @@ app.post('/api/persons', (req, res) => {
   person.save().then(savedPerson => {
     res.json(savedPerson).end()
   }) 
+  .catch(error => next(error))
   
 })
 
