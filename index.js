@@ -22,6 +22,19 @@ app.use(express.json())
 app.use(morgan('dev'))
 app.use(cors())
 app.use(express.static('dist'))
+
+const errorHandler = (error, request, response, next) => {
+  console.error(error.message)
+
+  if (error.name === 'CastError') {
+    return response.status(400).send({ error: 'malformatted id' })
+  } else if (error.name === 'ValidationError') {
+    return response.status(400).json({ error: error.message })
+  }
+
+  next(error)
+}
+
 morgan.token('postData', (req) => {
   if (req.method === 'POST'){
     return JSON.stringify(req.body)
@@ -29,12 +42,16 @@ morgan.token('postData', (req) => {
   return ' '
 })
 app.use(morgan(':method :url :status - :response-time ms :res[content-length] :postData'))
-let persons = []
 
-app.get('/api/persons', (req, res) => {
-    Person.find({}).then(persons => {
+
+app.get('/api/persons', (req, res, next) => {
+  if(req.body === undefined) {
+    return res.status(404).json({error: "content missing"})
+  }
+  Person.find({}).then(persons => {
       res.json(persons)
     })
+    .catch(err => next(err))
 })
 
 app.get('/info',  (req, res,next ) => {
@@ -66,13 +83,16 @@ app.get('/api/persons/:id', (req, res, next) => {
 })
 app.put('/api/persons/:id', (req, res, next) => {
   const id = req.params.id 
-  const {number} = req.body
+  const {name, number} = req.body
   if (!number) {
     return res.status(400).json({
       error: "number missing"
     })
   }
-  Person.findByIdAndUpdate(id, {number}, {new: true})
+  Person.findByIdAndUpdate(
+    id, {name, number}, 
+    {new: true}, 
+    {runValidators:true, context:'query'})
   .then(updatedPerson => {
     if (updatedPerson) {
       return res.json(updatedPerson)
@@ -101,10 +121,6 @@ app.post('/api/persons', (req, res, next) => {
     return res.status(400).json({
       error: "name or number missing"
     })
-  } else if (persons.find(p => p.name.toLowerCase() === body.name.toLowerCase())) {
-    return res.status(400).json({
-      error: "name already exist"
-    })
   }
   const person = new Person({
     name: body.name,
@@ -112,11 +128,11 @@ app.post('/api/persons', (req, res, next) => {
   })
   person.save().then(savedPerson => {
     res.json(savedPerson).end()
-  }) 
+  })
   .catch(error => next(error))
   
 })
-
+app.use(errorHandler)
 const PORT = process.env.PORT
 app.listen(PORT, () => {
     console.log(`Server running on PORT: ${PORT}`)
